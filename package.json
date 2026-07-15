@@ -1,0 +1,16 @@
+{
+  "name": "button-card-shared-templates",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Sidebar panel for the Button Card Shared Templates Home Assistant integration.",
+  "scripts": {
+    "build": "esbuild src/button-card-shared-templates.js --bundle --format=esm --outfile=custom_components/button_card_shared_templates/www/button-card-shared-templates.js"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "lit": "^3.2.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

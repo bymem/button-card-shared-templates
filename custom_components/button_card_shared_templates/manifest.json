@@ -1,0 +1,12 @@
+{
+  "domain": "button_card_shared_templates",
+  "name": "Button Card Shared Templates",
+  "codeowners": ["@bymem"],
+  "config_flow": false,
+  "dependencies": ["frontend", "lovelace", "websocket_api"],
+  "documentation": "https://github.com/bymem/button-card-shared-templates",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/bymem/button-card-shared-templates/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

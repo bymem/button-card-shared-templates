@@ -1,0 +1,27 @@
+name: Build check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Fail if www/ is out of sync with src/
+        run: |
+          if ! git diff --exit-code -- custom_components/button_card_shared_templates/www; then
+            echo "::error::www/ build artifact is out of date. Run 'npm run build' and commit the result."
+            exit 1
+          fi
