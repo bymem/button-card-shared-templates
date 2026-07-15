@@ -25,15 +25,11 @@ added, edited, or deleted.
    Assistant `config/custom_components/` directory.
 2. Restart Home Assistant.
 
-## Configuration
+## Setup
 
-Add the domain key to `configuration.yaml` (no options):
-
-```yaml
-button_card_shared_templates:
-```
-
-Restart Home Assistant. A **Button Card Templates** entry appears in the
+Settings → Devices & services → **+ Add integration** → search for
+**Button Card Shared Templates** → **Submit**. Nothing to configure — no
+YAML editing, no restart. A **Button Card Templates** entry appears in the
 sidebar (admin users only), and an empty `button_card_templates.yaml` is
 created in your config directory if one doesn't already exist.
 

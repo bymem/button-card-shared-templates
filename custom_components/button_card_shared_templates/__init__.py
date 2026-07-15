@@ -16,9 +16,9 @@ import yaml
 from homeassistant.components import frontend, websocket_api
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.components.lovelace.dashboard import LovelaceStorage
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
-from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -42,8 +42,12 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up the Button Card Shared Templates integration."""
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up Button Card Shared Templates from a config entry.
+
+    Single field-free config flow (see config_flow.py) - added via
+    Settings > Devices & services > Add integration, no YAML editing.
+    """
     hass.data[DOMAIN] = {"lock": asyncio.Lock()}
 
     await _async_ensure_templates_file(hass)
@@ -76,6 +80,13 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     websocket_api.async_register_command(hass, handle_delete)
     websocket_api.async_register_command(hass, handle_sync)
 
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload the config entry, removing the sidebar panel."""
+    frontend.async_remove_panel(hass, PANEL_URL)
+    hass.data.pop(DOMAIN, None)
     return True
 
 

@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Button Card Shared Templates",
+        "description": "Manage shared button-card templates from one sidebar panel. Nothing to configure — click Submit to finish setup."
+      }
+    },
+    "abort": {
+      "already_configured": "Button Card Shared Templates is already set up."
+    }
+  }
+}
