@@ -42,17 +42,53 @@ created in your config directory if one doesn't already exist.
 
 ## Usage
 
-- Open the **Button Card Templates** panel from the sidebar.
-- **+ New template** or click a row to open the editor: a name field plus a
-  raw YAML editor (`ha-yaml-editor`) for the template's `button-card` config.
+Open the **Button Card Templates** panel from the sidebar. **+ New template**
+(bottom right) or clicking an existing row opens the editor dialog, which has
+two separate fields:
+
+- **Name** — becomes the template's top-level key in
+  `button_card_templates.yaml`.
+- The **YAML editor** below it — holds only that key's *value*, i.e. the
+  `button-card` template config itself (`color_type`, `styles`,
+  `custom_fields`, etc.), indented one level in. Don't repeat the name inside
+  the editor, and don't wrap it in an extra `name:` line — the panel adds that
+  key for you from the Name field.
+
+For example, entering **Name**: `my_template_name` with this in the YAML
+editor:
+
+```yaml
+color_type: label-card
+styles:
+  card:
+    - padding: 4px
+```
+
+produces exactly this entry in `button_card_templates.yaml`:
+
+```yaml
+my_template_name:
+  color_type: label-card
+  styles:
+    card:
+      - padding: 4px
+```
+
+Renaming an existing template's **Name** and saving moves its config to the
+new key — the old key is removed, not duplicated.
+
 - Saving writes the template to `button_card_templates.yaml`, then pushes the
   full merged templates dict into every storage-mode dashboard's
   `button_card_templates` key.
+- A YAML syntax error in the editor is caught on save and shown inline in the
+  dialog rather than closing it — fix it and save again.
 - **Delete** removes a template and re-syncs, so the removal propagates too.
 - **Sync now** re-runs the push manually — useful after hand-editing the YAML
   file directly, or after creating a new dashboard.
 
-The templates file is human-editable directly and safe to version control:
+The templates file itself is human-editable directly and safe to version
+control — this is the same shape the dialog's Name + YAML editor combine
+into, just all the templates at once:
 
 ```yaml
 my_template_name:
