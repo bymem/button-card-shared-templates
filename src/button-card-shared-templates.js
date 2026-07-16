@@ -24,6 +24,12 @@ const mdiDelete =
 // clipped/mispositioned by the host's own layout (fixed/overlay UI needs
 // to sit at the document root, same reason HA's own dialogs always mount
 // there). Resolves true if the template was saved, false if cancelled.
+//
+// Name field is `ha-input`, not `ha-textfield` - HA replaced ha-textfield
+// (mwc-textfield) with ha-input (wa-input-backed) some time ago, and
+// ha-textfield no longer exists as a registered element at all. Creating
+// one silently produces an inert, unstyled, invisible element - that's why
+// the name field looked "missing" rather than erroring loudly.
 function openTemplateFormDialog(hass, { heading, name, originalName, isNew, yamlObj }) {
   return new Promise((resolve) => {
     let currentName = name;
@@ -35,21 +41,43 @@ function openTemplateFormDialog(hass, { heading, name, originalName, isNew, yaml
     dialog.headerTitle = heading;
     dialog.width = "medium";
     dialog.allowModeChange = true;
+    // Makes ha-dialog's/ha-bottom-sheet's own content area a flex column
+    // (see ha-dialog.ts `:host([flexcontent]) .body`), so our content div
+    // below can flex-grow to fill it instead of shrink-wrapping to the
+    // yaml editor's own intrinsic height.
+    dialog.flexContent = true;
+    // ha-dialog reads this custom property for the dialog surface's
+    // min-height (ha-dialog.ts: `min-height: var(--ha-dialog-min-height)`)
+    // - same mechanism NativePop uses for --ha-dialog-width-md, just the
+    // height counterpart. Makes the dialog fill most of the viewport
+    // instead of shrink-wrapping to the name field + a small editor.
+    dialog.style.setProperty("--ha-dialog-min-height", "95vh");
     dialog.open = true;
 
     const content = document.createElement("div");
     content.style.display = "flex";
     content.style.flexDirection = "column";
     content.style.gap = "16px";
+    content.style.flex = "1";
+    content.style.minHeight = "0";
 
-    const nameField = document.createElement("ha-textfield");
+    const nameField = document.createElement("ha-input");
     nameField.label = "Name";
     nameField.value = currentName;
     nameField.autofocus = true;
+    nameField.toggleAttribute("autofocus", true);
     content.appendChild(nameField);
 
     const yamlEditor = document.createElement("ha-yaml-editor");
     yamlEditor.defaultValue = currentYamlObj;
+    yamlEditor.inDialog = true;
+    // ha-yaml-editor's own ha-code-editor is `flex-grow: 1` internally
+    // (ha-yaml-editor.ts), but that only does anything once ha-yaml-editor
+    // itself is a flex column - it isn't one by default, so force it here.
+    yamlEditor.style.flex = "1";
+    yamlEditor.style.minHeight = "0";
+    yamlEditor.style.display = "flex";
+    yamlEditor.style.flexDirection = "column";
     content.appendChild(yamlEditor);
 
     const errorEl = document.createElement("div");
