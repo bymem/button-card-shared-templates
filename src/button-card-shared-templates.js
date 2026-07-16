@@ -1,5 +1,33 @@
-import { LitElement, html, css, nothing } from "lit";
+import { LitElement, html, nothing } from "lit";
 import jsyaml from "js-yaml";
+
+// Shared loading-spinner styles, injected into document.head once rather
+// than duplicated per instance - same technique NativePop uses for its own
+// panel/dialog loading states. Hand-rolled CSS spinner rather than an HA
+// internal component (e.g. ha-circular-progress): zero dependency on
+// undocumented internals, themes via var(--primary-color).
+(function injectSharedStyles() {
+  if (document.getElementById("bcst-shared-styles")) {
+    return;
+  }
+  const style = document.createElement("style");
+  style.id = "bcst-shared-styles";
+  style.textContent = `
+    .bcst-loading {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; padding: 48px 24px; min-height: 200px;
+      color: var(--secondary-text-color);
+    }
+    .bcst-spinner {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 3px solid var(--divider-color);
+      border-top-color: var(--primary-color);
+      animation: bcst-spin 0.8s linear infinite;
+    }
+    @keyframes bcst-spin { to { transform: rotate(360deg); } }
+  `;
+  document.head.appendChild(style);
+})();
 
 const WS_GET = "button_card_shared_templates/get";
 const WS_LIST = "button_card_shared_templates/list";
@@ -185,8 +213,24 @@ class ButtonCardSharedTemplatesPanel extends LitElement {
     this._syncing = false;
   }
 
+  // Render into light DOM instead of the LitElement default shadow root -
+  // matches NativePop's approach (plain HTMLElement + innerHTML) and avoids
+  // the same class of shadow-DOM containment issue that broke the dialog:
+  // .fab-button below is `position: fixed`, which can end up positioned
+  // relative to some transformed ancestor instead of the viewport if it's
+  // trapped behind a shadow boundary inside HA's app shell. Also means
+  // `static styles` (shadow-only) doesn't apply - styles are a plain
+  // <style> tag in the template instead, same as the injected block above.
+  createRenderRoot() {
+    return this;
+  }
+
   firstUpdated() {
     this._fetchList();
+  }
+
+  _toggleMenu() {
+    this.dispatchEvent(new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true }));
   }
 
   get _columns() {
@@ -245,37 +289,102 @@ class ButtonCardSharedTemplatesPanel extends LitElement {
       return nothing;
     }
 
+    // Toolbar (sticky, app-header styled) + full-bleed content + a FAB-
+    // style "+ New template" button - the same layout NativePop's own
+    // panel uses (Settings > Dashboards' own layout, in turn), rather than
+    // a padded header row with inline buttons. The menu button only shows
+    // narrow/mobile, toggling HA's real sidebar via the same event
+    // ha-menu-button itself dispatches.
     return html`
-      <div class="header">
-        <h1>Button Card Templates</h1>
-        <div class="actions">
-          <ha-button @click=${this._syncNow} .disabled=${this._syncing}>
-            <ha-icon slot="start" icon="mdi:sync"></ha-icon>
-            Sync now
-          </ha-button>
-          <ha-button size="l" @click=${() => this._openDialog()}>
-            <ha-icon slot="start" icon="mdi:plus"></ha-icon>
-            New template
-          </ha-button>
-        </div>
+      <style>
+        button-card-shared-templates-panel {
+          display: block;
+          height: 100%;
+          box-sizing: border-box;
+          overflow: auto;
+          background: var(--primary-background-color);
+        }
+        .bcst-toolbar {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          height: 56px;
+          padding: 0 16px;
+          box-sizing: border-box;
+          background: var(--app-header-background-color, var(--primary-background-color));
+          color: var(--app-header-text-color, var(--primary-text-color));
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+          position: sticky;
+          top: 0;
+          z-index: 1;
+        }
+        .bcst-toolbar .bcst-title {
+          font-size: 20px;
+          font-weight: 400;
+          flex: 1;
+        }
+        .bcst-content {
+          padding: 16px;
+          padding-bottom: 88px;
+        }
+        search-input {
+          display: block;
+          margin-bottom: 8px;
+        }
+        .bcst-fab-button {
+          position: fixed;
+          bottom: 16px;
+          right: 16px;
+          z-index: 2;
+        }
+      </style>
+
+      <div class="bcst-toolbar">
+        ${this.narrow
+          ? html`
+              <ha-icon-button label="Menu" @click=${this._toggleMenu}>
+                <ha-icon icon="mdi:menu"></ha-icon>
+              </ha-icon-button>
+            `
+          : nothing}
+        <span class="bcst-title">Button Card Templates</span>
+        <ha-icon-button
+          label="Sync now"
+          .disabled=${this._syncing}
+          @click=${this._syncNow}
+        >
+          <ha-icon icon="mdi:sync"></ha-icon>
+        </ha-icon-button>
       </div>
 
-      <search-input
-        .hass=${this.hass}
-        .filter=${this._filter}
-        @value-changed=${this._handleSearchInput}
-        .label=${"Search templates"}
-      ></search-input>
+      <div class="bcst-content">
+        ${this._loading
+          ? html`<div class="bcst-loading"><div class="bcst-spinner"></div></div>`
+          : html`
+              <search-input
+                .hass=${this.hass}
+                .filter=${this._filter}
+                @value-changed=${this._handleSearchInput}
+                .label=${"Search templates"}
+              ></search-input>
 
-      <ha-data-table
-        .hass=${this.hass}
-        .columns=${this._columns}
-        .data=${this._rows}
-        .filter=${this._filter}
-        .noDataText=${this._loading ? "Loading…" : "No templates yet."}
-        clickable
-        @row-click=${this._handleRowClick}
-      ></ha-data-table>
+              <ha-data-table
+                .hass=${this.hass}
+                .columns=${this._columns}
+                .data=${this._rows}
+                .filter=${this._filter}
+                .noDataText=${"No templates yet — create one to get started."}
+                clickable
+                auto-height
+                @row-click=${this._handleRowClick}
+              ></ha-data-table>
+            `}
+      </div>
+
+      <ha-button size="l" class="bcst-fab-button" @click=${() => this._openDialog()}>
+        <ha-icon slot="start" icon="mdi:plus"></ha-icon>
+        New template
+      </ha-button>
     `;
   }
 
@@ -347,31 +456,6 @@ class ButtonCardSharedTemplatesPanel extends LitElement {
       this._fetchList();
     }
   }
-
-  static styles = css`
-    :host {
-      display: block;
-      padding: 16px;
-    }
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-    }
-    .header h1 {
-      font-size: 24px;
-      margin: 0;
-    }
-    .actions {
-      display: flex;
-      gap: 8px;
-    }
-    search-input {
-      display: block;
-      margin-bottom: 8px;
-    }
-  `;
 }
 
 customElements.define("button-card-shared-templates-panel", ButtonCardSharedTemplatesPanel);

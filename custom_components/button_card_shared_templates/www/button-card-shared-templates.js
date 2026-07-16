@@ -22,14 +22,6 @@ var n = class {
   }
 };
 var r = (t3) => new n("string" == typeof t3 ? t3 : t3 + "", void 0, s);
-var i = (t3, ...e4) => {
-  const o5 = 1 === t3.length ? t3[0] : e4.reduce((e5, s4, o6) => e5 + ((t4) => {
-    if (true === t4._$cssResult$) return t4.cssText;
-    if ("number" == typeof t4) return t4;
-    throw Error("Value passed to 'css' function must be a 'css' function result: " + t4 + ". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.");
-  })(s4) + t3[o6 + 1], t3[0]);
-  return new n(o5, t3, s);
-};
 var S = (s4, o5) => {
   if (e) s4.adoptedStyleSheets = o5.map((t3) => t3 instanceof CSSStyleSheet ? t3 : t3.styleSheet);
   else for (const e4 of o5) {
@@ -3607,6 +3599,28 @@ var {
 } = yaml;
 
 // src/button-card-shared-templates.js
+(function injectSharedStyles() {
+  if (document.getElementById("bcst-shared-styles")) {
+    return;
+  }
+  const style = document.createElement("style");
+  style.id = "bcst-shared-styles";
+  style.textContent = `
+    .bcst-loading {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; padding: 48px 24px; min-height: 200px;
+      color: var(--secondary-text-color);
+    }
+    .bcst-spinner {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 3px solid var(--divider-color);
+      border-top-color: var(--primary-color);
+      animation: bcst-spin 0.8s linear infinite;
+    }
+    @keyframes bcst-spin { to { transform: rotate(360deg); } }
+  `;
+  document.head.appendChild(style);
+})();
 var WS_GET = "button_card_shared_templates/get";
 var WS_LIST = "button_card_shared_templates/list";
 var WS_SAVE = "button_card_shared_templates/save";
@@ -3734,8 +3748,22 @@ var ButtonCardSharedTemplatesPanel = class extends i4 {
     this._loading = false;
     this._syncing = false;
   }
+  // Render into light DOM instead of the LitElement default shadow root -
+  // matches NativePop's approach (plain HTMLElement + innerHTML) and avoids
+  // the same class of shadow-DOM containment issue that broke the dialog:
+  // .fab-button below is `position: fixed`, which can end up positioned
+  // relative to some transformed ancestor instead of the viewport if it's
+  // trapped behind a shadow boundary inside HA's app shell. Also means
+  // `static styles` (shadow-only) doesn't apply - styles are a plain
+  // <style> tag in the template instead, same as the injected block above.
+  createRenderRoot() {
+    return this;
+  }
   firstUpdated() {
     this._fetchList();
+  }
+  _toggleMenu() {
+    this.dispatchEvent(new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true }));
   }
   get _columns() {
     return {
@@ -3790,36 +3818,91 @@ var ButtonCardSharedTemplatesPanel = class extends i4 {
       return A;
     }
     return b2`
-      <div class="header">
-        <h1>Button Card Templates</h1>
-        <div class="actions">
-          <ha-button @click=${this._syncNow} .disabled=${this._syncing}>
-            <ha-icon slot="start" icon="mdi:sync"></ha-icon>
-            Sync now
-          </ha-button>
-          <ha-button size="l" @click=${() => this._openDialog()}>
-            <ha-icon slot="start" icon="mdi:plus"></ha-icon>
-            New template
-          </ha-button>
-        </div>
+      <style>
+        button-card-shared-templates-panel {
+          display: block;
+          height: 100%;
+          box-sizing: border-box;
+          overflow: auto;
+          background: var(--primary-background-color);
+        }
+        .bcst-toolbar {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          height: 56px;
+          padding: 0 16px;
+          box-sizing: border-box;
+          background: var(--app-header-background-color, var(--primary-background-color));
+          color: var(--app-header-text-color, var(--primary-text-color));
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+          position: sticky;
+          top: 0;
+          z-index: 1;
+        }
+        .bcst-toolbar .bcst-title {
+          font-size: 20px;
+          font-weight: 400;
+          flex: 1;
+        }
+        .bcst-content {
+          padding: 16px;
+          padding-bottom: 88px;
+        }
+        search-input {
+          display: block;
+          margin-bottom: 8px;
+        }
+        .bcst-fab-button {
+          position: fixed;
+          bottom: 16px;
+          right: 16px;
+          z-index: 2;
+        }
+      </style>
+
+      <div class="bcst-toolbar">
+        ${this.narrow ? b2`
+              <ha-icon-button label="Menu" @click=${this._toggleMenu}>
+                <ha-icon icon="mdi:menu"></ha-icon>
+              </ha-icon-button>
+            ` : A}
+        <span class="bcst-title">Button Card Templates</span>
+        <ha-icon-button
+          label="Sync now"
+          .disabled=${this._syncing}
+          @click=${this._syncNow}
+        >
+          <ha-icon icon="mdi:sync"></ha-icon>
+        </ha-icon-button>
       </div>
 
-      <search-input
-        .hass=${this.hass}
-        .filter=${this._filter}
-        @value-changed=${this._handleSearchInput}
-        .label=${"Search templates"}
-      ></search-input>
+      <div class="bcst-content">
+        ${this._loading ? b2`<div class="bcst-loading"><div class="bcst-spinner"></div></div>` : b2`
+              <search-input
+                .hass=${this.hass}
+                .filter=${this._filter}
+                @value-changed=${this._handleSearchInput}
+                .label=${"Search templates"}
+              ></search-input>
 
-      <ha-data-table
-        .hass=${this.hass}
-        .columns=${this._columns}
-        .data=${this._rows}
-        .filter=${this._filter}
-        .noDataText=${this._loading ? "Loading\u2026" : "No templates yet."}
-        clickable
-        @row-click=${this._handleRowClick}
-      ></ha-data-table>
+              <ha-data-table
+                .hass=${this.hass}
+                .columns=${this._columns}
+                .data=${this._rows}
+                .filter=${this._filter}
+                .noDataText=${"No templates yet \u2014 create one to get started."}
+                clickable
+                auto-height
+                @row-click=${this._handleRowClick}
+              ></ha-data-table>
+            `}
+      </div>
+
+      <ha-button size="l" class="bcst-fab-button" @click=${() => this._openDialog()}>
+        <ha-icon slot="start" icon="mdi:plus"></ha-icon>
+        New template
+      </ha-button>
     `;
   }
   async _fetchList() {
@@ -3884,30 +3967,6 @@ var ButtonCardSharedTemplatesPanel = class extends i4 {
       this._fetchList();
     }
   }
-  static styles = i`
-    :host {
-      display: block;
-      padding: 16px;
-    }
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-    }
-    .header h1 {
-      font-size: 24px;
-      margin: 0;
-    }
-    .actions {
-      display: flex;
-      gap: 8px;
-    }
-    search-input {
-      display: block;
-      margin-bottom: 8px;
-    }
-  `;
 };
 customElements.define("button-card-shared-templates-panel", ButtonCardSharedTemplatesPanel);
 /*! Bundled license information:
