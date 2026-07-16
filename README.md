@@ -11,6 +11,13 @@ out of sync. This integration keeps templates in one YAML file and pushes the
 merged result into every dashboard's stored config whenever a template is
 added, edited, or deleted.
 
+## Requirements
+
+[`button-card`](https://github.com/custom-cards/button-card) itself must
+already be installed (e.g. via HACS) and added as a dashboard resource.
+This integration only manages the shared `button_card_templates:` config —
+it doesn't install or replace the `button-card` custom card.
+
 ## Installation
 
 ### HACS (custom repository)
