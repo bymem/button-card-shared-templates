@@ -42,23 +42,32 @@ const mdiPencil =
 const mdiDelete =
   "M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z";
 
-// Create/edit dialog - built with plain DOM calls and appended straight to
-// document.body, matching NativePop's dialog technique (dialog-lovelace-
-// dashboard-detail.ts style): ha-adaptive-dialog (renders as a real
-// ha-dialog on desktop, a swipeable ha-bottom-sheet on mobile) + a plain
-// content div + ha-dialog-footer with ha-button primary/secondary actions.
-// This intentionally does NOT render inside the panel's own LitElement
-// shadow root - a dialog nested in a custom element's shadow DOM can get
-// clipped/mispositioned by the host's own layout (fixed/overlay UI needs
-// to sit at the document root, same reason HA's own dialogs always mount
-// there). Resolves true if the template was saved, false if cancelled.
+// Create/edit dialog - built with plain DOM calls: ha-adaptive-dialog
+// (renders as a real ha-dialog on desktop, a swipeable ha-bottom-sheet on
+// mobile) + a plain content div + ha-dialog-footer with ha-button
+// primary/secondary actions. Resolves true if the template was saved,
+// false if cancelled.
+//
+// Appended under `mountEl` (the panel element itself) rather than
+// document.body. HA's own dialog manager (make-dialog-manager.ts) mounts
+// dialogs inside the app's root element's own shadow root specifically so
+// Lit's @lit/context providers (ContextProvider instances attached to
+// <home-assistant> in state/context-mixin.ts, e.g. internationalization)
+// can reach them - a context-request event only reaches a provider via
+// genuine DOM ancestry, and document.body is a *sibling* of
+// <home-assistant>, not a descendant. Appending to document.body silently
+// broke ha-yaml-editor, which reads that context on every YAML change to
+// build the "invalid YAML" error message and throws if it's missing. The
+// panel element is already a real descendant of <home-assistant> (that's
+// how it gets `.hass` at all), so mounting there fixes context propagation
+// without needing a global document.querySelector for the app root.
 //
 // Name field is `ha-input`, not `ha-textfield` - HA replaced ha-textfield
 // (mwc-textfield) with ha-input (wa-input-backed) some time ago, and
 // ha-textfield no longer exists as a registered element at all. Creating
 // one silently produces an inert, unstyled, invisible element - that's why
 // the name field looked "missing" rather than erroring loudly.
-function openTemplateFormDialog(hass, { heading, name, originalName, isNew, yamlObj }) {
+function openTemplateFormDialog(hass, mountEl, { heading, name, originalName, isNew, yamlObj }) {
   return new Promise((resolve) => {
     let currentName = name;
     let currentYamlObj = yamlObj;
@@ -190,7 +199,7 @@ function openTemplateFormDialog(hass, { heading, name, originalName, isNew, yaml
       }
     });
 
-    document.body.appendChild(dialog);
+    mountEl.appendChild(dialog);
   });
 }
 
@@ -451,7 +460,7 @@ class ButtonCardSharedTemplatesPanel extends LitElement {
       };
     }
 
-    const saved = await openTemplateFormDialog(this.hass, dialogParams);
+    const saved = await openTemplateFormDialog(this.hass, this, dialogParams);
     if (saved) {
       this._fetchList();
     }
