@@ -137,11 +137,16 @@ function openTemplateFormDialog(hass, mountEl, { heading, name, originalName, is
     // valid parse right after a large paste, which isn't guaranteed (a
     // CodeMirror paste doesn't necessarily fire the same way a typed edit
     // does), and failed silently with zero feedback when it didn't.
+    //
+    // Lives in the footer (secondaryAction slot, alongside Cancel) rather
+    // than in the scrollable content column - a tall pasted template makes
+    // the yaml editor tall enough that a button placed after it in content
+    // could be scrolled out of view entirely. The footer is always visible
+    // regardless of how long the editor's content is.
     const unwrapBtn = document.createElement("ha-button");
+    unwrapBtn.slot = "secondaryAction";
     unwrapBtn.setAttribute("appearance", "plain");
-    unwrapBtn.style.alignSelf = "flex-start";
-    unwrapBtn.textContent = "Extract name from pasted YAML";
-    content.appendChild(unwrapBtn);
+    unwrapBtn.textContent = "Extract name";
 
     unwrapBtn.addEventListener("click", () => {
       if (currentYamlValid === false) {
@@ -234,6 +239,7 @@ function openTemplateFormDialog(hass, mountEl, { heading, name, originalName, is
 
     const footer = document.createElement("ha-dialog-footer");
     footer.slot = "footer";
+    footer.appendChild(unwrapBtn);
     footer.appendChild(cancelBtn);
     footer.appendChild(saveBtn);
 

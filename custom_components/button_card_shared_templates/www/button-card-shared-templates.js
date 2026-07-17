@@ -3662,10 +3662,9 @@ function openTemplateFormDialog(hass, mountEl, { heading, name, originalName, is
     yamlEditor.style.flexDirection = "column";
     content.appendChild(yamlEditor);
     const unwrapBtn = document.createElement("ha-button");
+    unwrapBtn.slot = "secondaryAction";
     unwrapBtn.setAttribute("appearance", "plain");
-    unwrapBtn.style.alignSelf = "flex-start";
-    unwrapBtn.textContent = "Extract name from pasted YAML";
-    content.appendChild(unwrapBtn);
+    unwrapBtn.textContent = "Extract name";
     unwrapBtn.addEventListener("click", () => {
       if (currentYamlValid === false) {
         showError("Fix the YAML syntax errors before extracting a name from it.");
@@ -3748,6 +3747,7 @@ function openTemplateFormDialog(hass, mountEl, { heading, name, originalName, is
     });
     const footer = document.createElement("ha-dialog-footer");
     footer.slot = "footer";
+    footer.appendChild(unwrapBtn);
     footer.appendChild(cancelBtn);
     footer.appendChild(saveBtn);
     dialog.appendChild(content);
