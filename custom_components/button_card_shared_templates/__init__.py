@@ -15,6 +15,7 @@ import yaml
 
 from homeassistant.components import frontend, websocket_api
 from homeassistant.components.http import StaticPathConfig
+from homeassistant.components.lovelace.const import LOVELACE_DATA
 from homeassistant.components.lovelace.dashboard import LovelaceStorage
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -162,12 +163,15 @@ async def async_sync_dashboards(hass: HomeAssistant) -> None:
     """Push the current merged templates dict into every storage dashboard."""
     templates = await _async_load_templates(hass)
 
-    lovelace_data = hass.data.get("lovelace")
+    # hass.data[LOVELACE_DATA] is a LovelaceData dataclass (see
+    # homeassistant/components/lovelace/__init__.py), not a dict - its
+    # .dashboards attribute is the actual dict of url_path -> LovelaceConfig.
+    lovelace_data = hass.data.get(LOVELACE_DATA)
     if not lovelace_data:
         _LOGGER.debug("Lovelace is not set up yet, skipping sync")
         return
 
-    dashboards = lovelace_data.get("dashboards", {})
+    dashboards = lovelace_data.dashboards
     for url_path, dashboard in dashboards.items():
         if not isinstance(dashboard, LovelaceStorage):
             _LOGGER.debug(

@@ -3697,16 +3697,20 @@ function openTemplateFormDialog(hass, mountEl, { heading, name, originalName, is
         showError("Fix the YAML syntax errors before saving.");
         return;
       }
-      const payload = {
-        type: WS_SAVE,
-        name: trimmedName,
-        yaml: yaml.dump(currentYamlObj ?? {})
-      };
-      if (!isNew && originalName !== trimmedName) {
-        payload.old_name = originalName;
-      }
       saveBtn.disabled = true;
       try {
+        const payload = {
+          type: WS_SAVE,
+          name: trimmedName,
+          // jsyaml.dump() is inside the try too - a dump failure (e.g. an
+          // unsupported value type sneaking into currentYamlObj) used to
+          // throw outside any catch here, producing a bare unhandled
+          // promise rejection instead of the inline dialog error.
+          yaml: yaml.dump(currentYamlObj ?? {})
+        };
+        if (!isNew && originalName !== trimmedName) {
+          payload.old_name = originalName;
+        }
         await hass.callWS(payload);
         resolved = true;
         dialog.open = false;
@@ -3905,10 +3909,17 @@ var ButtonCardSharedTemplatesPanel = class extends i4 {
       </ha-button>
     `;
   }
+  // Called fire-and-forget from several places (firstUpdated, after
+  // save/delete, etc.) without anyone awaiting or catching the returned
+  // promise - it must never reject itself, or a failed refresh turns into
+  // a bare "Unhandled Promise Rejection" instead of a visible error.
   async _fetchList() {
     this._loading = true;
     try {
       this._templates = await this.hass.callWS({ type: WS_LIST });
+    } catch (err) {
+      console.error("Could not load templates", err);
+      alert("Could not load templates. See console for details.");
     } finally {
       this._loading = false;
     }
@@ -3918,6 +3929,9 @@ var ButtonCardSharedTemplatesPanel = class extends i4 {
     try {
       await this.hass.callWS({ type: WS_SYNC });
       await this._fetchList();
+    } catch (err) {
+      console.error("Sync failed", err);
+      alert("Sync failed. See console for details.");
     } finally {
       this._syncing = false;
     }
@@ -3932,8 +3946,13 @@ var ButtonCardSharedTemplatesPanel = class extends i4 {
     if (!confirm(`Delete template "${name}"? This cannot be undone.`)) {
       return;
     }
-    await this.hass.callWS({ type: WS_DELETE, name });
-    this._fetchList();
+    try {
+      await this.hass.callWS({ type: WS_DELETE, name });
+      this._fetchList();
+    } catch (err) {
+      console.error(`Could not delete template "${name}"`, err);
+      alert(`Could not delete template "${name}". See console for details.`);
+    }
   }
   async _openDialog(name) {
     let dialogParams;
