@@ -93,10 +93,13 @@ base:
 ```
 
 you don't need to manually split the name out or fix the indentation. Paste
-the whole block into the YAML editor as-is; a **Use "base" as name** button
-appears whenever the editor's content has exactly one top-level key. Clicking
-it moves that key into the Name field and replaces the editor's content with
-just its value, re-indented to a clean 2-space style.
+the whole block into the YAML editor as-is, then click **Extract name from
+pasted YAML** below it. If the editor's content is exactly one top-level key
+with a nested config under it, that key moves into the Name field and the
+editor's content is replaced with just its value, re-indented to a clean
+2-space style. If it isn't shaped that way (invalid YAML, or more/less than
+one top-level key), you'll get a specific error explaining why instead of the
+button just doing nothing.
 
 - Saving writes the template to `button_card_templates.yaml`, then pushes the
   full merged templates dict into every storage-mode dashboard's

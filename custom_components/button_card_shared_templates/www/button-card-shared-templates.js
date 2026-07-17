@@ -3663,32 +3663,29 @@ function openTemplateFormDialog(hass, mountEl, { heading, name, originalName, is
     content.appendChild(yamlEditor);
     const unwrapBtn = document.createElement("ha-button");
     unwrapBtn.setAttribute("appearance", "plain");
-    unwrapBtn.hidden = true;
     unwrapBtn.style.alignSelf = "flex-start";
+    unwrapBtn.textContent = "Extract name from pasted YAML";
     content.appendChild(unwrapBtn);
-    const updateUnwrapButton = () => {
-      const keys = Object.keys(currentYamlObj || {});
-      const soleValue = keys.length === 1 ? currentYamlObj[keys[0]] : void 0;
-      if (keys.length === 1 && soleValue && typeof soleValue === "object") {
-        unwrapBtn.textContent = `Use "${keys[0]}" as name`;
-        unwrapBtn.hidden = false;
-      } else {
-        unwrapBtn.hidden = true;
-      }
-    };
-    updateUnwrapButton();
     unwrapBtn.addEventListener("click", () => {
-      const [key] = Object.keys(currentYamlObj || {});
-      if (!key) {
+      if (currentYamlValid === false) {
+        showError("Fix the YAML syntax errors before extracting a name from it.");
         return;
       }
-      const value = currentYamlObj[key];
+      const keys = Object.keys(currentYamlObj || {});
+      const soleValue = keys.length === 1 ? currentYamlObj[keys[0]] : void 0;
+      if (keys.length !== 1 || !soleValue || typeof soleValue !== "object") {
+        showError(
+          `Expected exactly one top-level key with a nested config (like "name:" followed by an indented block) - found ${keys.length} top-level key(s) instead.`
+        );
+        return;
+      }
+      const [key] = keys;
       currentName = key;
       nameField.value = key;
       saveBtn.disabled = !currentName.trim();
-      currentYamlObj = value;
-      yamlEditor.setValue(value);
-      unwrapBtn.hidden = true;
+      currentYamlObj = soleValue;
+      yamlEditor.setValue(soleValue);
+      errorEl.hidden = true;
     });
     const errorEl = document.createElement("div");
     errorEl.style.color = "var(--error-color)";
@@ -3716,7 +3713,6 @@ function openTemplateFormDialog(hass, mountEl, { heading, name, originalName, is
     yamlEditor.addEventListener("value-changed", (ev) => {
       currentYamlObj = ev.detail.value;
       currentYamlValid = ev.detail.isValid;
-      updateUnwrapButton();
     });
     saveBtn.addEventListener("click", async () => {
       const trimmedName = currentName.trim();
