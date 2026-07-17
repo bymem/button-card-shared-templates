@@ -52,11 +52,15 @@ another_template:
   layer on top of this file, not the only way to change it.
 - `last_modified` per template is **not** stored in this file (would
   pollute the YAML users may want to hand-edit/diff). Track it separately
-  in a small sidecar, e.g. `.storage/button_card_templates_meta` via HA's
-  `Store` helper, keyed by template name → ISO timestamp. Updated only by
-  the integration's own save path; a manual edit to the YAML file won't
-  update the sidecar until the next panel save touches that key (acceptable
-  — "last modified" is a UI nicety, not a sync trigger).
+  in a small sidecar, e.g. `.storage/button_card_shared_templates_meta` via
+  HA's `Store` helper: `{"last_modified": {name: iso_timestamp}, "managed_names":
+  [name, ...]}`. `last_modified` is updated only by the integration's own
+  save path; a manual edit to the YAML file won't update it until the next
+  panel save touches that key (acceptable — "last modified" is a UI nicety,
+  not a sync trigger). `managed_names` is every name ever saved *or
+  deleted* through the panel — it only grows, never shrinks — and is what
+  the sync step uses to tell "ours" apart from templates a dashboard had
+  before this integration touched it (see Sync step below).
 
 ## Backend: `custom_components/button_card_shared_templates/`
 
@@ -100,12 +104,32 @@ another_template:
 ### Sync step
 
 ```
-for each dashboard in hass.data[lovelace_domain]["dashboards"]:
+managed_names = <every template name this integration has ever saved or
+                  deleted — a set that only grows, tracked in the metadata
+                  sidecar, never shrunk when a template is deleted>
+
+for each dashboard in hass.data[LOVELACE_DATA].dashboards:
     config = await dashboard.async_load(force=True)
-    config["button_card_templates"] = <current merged templates dict>
+    existing = config.get("button_card_templates") or {}
+    foreign = {name: cfg for name, cfg in existing.items()
+               if name not in managed_names}
+    config["button_card_templates"] = {**foreign, **<current merged templates dict>}
     await dashboard.async_save(config)
 ```
 
+- **Merges, does not replace.** A dashboard's `button_card_templates` key
+  can contain templates this integration has never touched — hand-added the
+  old per-dashboard way, either before this integration was installed or
+  simply never edited through the panel. Only names this integration has
+  ever managed are overwritten (including removed entirely, if deleted);
+  every other existing key passes through untouched. An earlier version did
+  a blind full-key replace and silently deleted any such foreign templates
+  on first sync — a real data-loss bug, not a hypothetical one.
+- `managed_names` must **not** shrink when a template is deleted through the
+  panel — only that lets the deleted name still be recognized as "ours" on
+  the next sync and actually scrubbed from every dashboard, rather than
+  looking like a foreign template and having its stale copy preserved
+  forever.
 - Calls `LovelaceStorage.async_load()` / `async_save()` directly as normal
   method calls — not patched, not overridden. This is the same
   read-whole-config/write-whole-config cycle the dashboard UI editor

@@ -136,8 +136,10 @@ async def _async_save_templates(hass: HomeAssistant, templates: dict) -> None:
 
 # ---------------------------------------------------------------------------
 # Metadata sidecar (.storage/button_card_shared_templates_meta) — tracks
-# last_modified per template. Kept out of the YAML file so hand-editing it
-# doesn't pick up noise. Only the integration's own save path updates it.
+# last_modified per template, plus every template name this integration has
+# ever managed (see async_sync_dashboards for why the latter exists). Kept
+# out of the YAML file so hand-editing it doesn't pick up noise. Only the
+# integration's own save/delete paths update it.
 # ---------------------------------------------------------------------------
 
 
@@ -147,7 +149,16 @@ def _meta_store(hass: HomeAssistant) -> Store:
 
 async def _async_load_meta(hass: HomeAssistant) -> dict:
     data = await _meta_store(hass).async_load()
-    return data or {}
+    if not data:
+        return {"last_modified": {}, "managed_names": []}
+    # Older versions of this integration stored a flat {name: timestamp}
+    # dict directly - migrate it into the new shape on first load rather
+    # than losing the existing timestamps.
+    if "last_modified" not in data and "managed_names" not in data:
+        return {"last_modified": data, "managed_names": list(data)}
+    data.setdefault("last_modified", {})
+    data.setdefault("managed_names", [])
+    return data
 
 
 async def _async_save_meta(hass: HomeAssistant, meta: dict) -> None:
@@ -160,8 +171,26 @@ async def _async_save_meta(hass: HomeAssistant, meta: dict) -> None:
 
 
 async def async_sync_dashboards(hass: HomeAssistant) -> None:
-    """Push the current merged templates dict into every storage dashboard."""
+    """Merge the current templates into every storage dashboard.
+
+    A dashboard's `button_card_templates` key may contain templates this
+    integration has never touched - hand-added the old per-dashboard way,
+    before this integration was installed or for a template nobody has
+    edited through the panel yet. Blindly overwriting the whole key with
+    only what's in our own file would silently delete those. Instead, only
+    names this integration has ever managed (`managed_names`, which - unlike
+    the templates file itself - is never shrunk on delete, precisely so a
+    deleted template still gets scrubbed from dashboards instead of being
+    mistaken for a foreign one) are replaced; every other existing key in
+    the dashboard's config passes through untouched.
+    """
     templates = await _async_load_templates(hass)
+    meta = await _async_load_meta(hass)
+    # Fall back to "every currently-known template name" if managed_names
+    # hasn't been recorded yet (data written before this existed) - close
+    # enough for one sync cycle, and self-corrects from there since every
+    # save/delete adds to managed_names going forward.
+    managed_names = set(meta.get("managed_names") or templates.keys())
 
     # hass.data[LOVELACE_DATA] is a LovelaceData dataclass (see
     # homeassistant/components/lovelace/__init__.py), not a dict - its
@@ -181,7 +210,13 @@ async def async_sync_dashboards(hass: HomeAssistant) -> None:
 
         try:
             dashboard_config = await dashboard.async_load(force=True)
-            dashboard_config["button_card_templates"] = templates
+            existing = dashboard_config.get("button_card_templates") or {}
+            foreign = {
+                name: config
+                for name, config in existing.items()
+                if name not in managed_names
+            }
+            dashboard_config["button_card_templates"] = {**foreign, **templates}
             await dashboard.async_save(dashboard_config)
         except Exception:  # noqa: BLE001 - one bad dashboard shouldn't abort the rest
             _LOGGER.exception(
@@ -200,9 +235,10 @@ async def handle_list(hass: HomeAssistant, connection, msg) -> None:
     """List all templates with their last-modified timestamp."""
     templates = await _async_load_templates(hass)
     meta = await _async_load_meta(hass)
+    last_modified = meta["last_modified"]
 
     result = [
-        {"name": name, "last_modified": meta.get(name)}
+        {"name": name, "last_modified": last_modified.get(name)}
         for name in sorted(templates)
     ]
     connection.send_result(msg["id"], result)
@@ -270,8 +306,15 @@ async def handle_save(hass: HomeAssistant, connection, msg) -> None:
 
         meta = await _async_load_meta(hass)
         if old_name and old_name != name:
-            meta.pop(old_name, None)
-        meta[name] = dt_util.utcnow().isoformat()
+            meta["last_modified"].pop(old_name, None)
+        meta["last_modified"][name] = dt_util.utcnow().isoformat()
+        # old_name stays in managed_names even though it's gone from
+        # last_modified - see async_sync_dashboards for why.
+        managed_names = set(meta["managed_names"])
+        managed_names.add(name)
+        if old_name:
+            managed_names.add(old_name)
+        meta["managed_names"] = sorted(managed_names)
         await _async_save_meta(hass, meta)
 
     await async_sync_dashboards(hass)
@@ -296,7 +339,14 @@ async def handle_delete(hass: HomeAssistant, connection, msg) -> None:
         await _async_save_templates(hass, templates)
 
         meta = await _async_load_meta(hass)
-        meta.pop(name, None)
+        meta["last_modified"].pop(name, None)
+        # name stays in managed_names - see async_sync_dashboards for why:
+        # without this, the next sync would treat the just-deleted template
+        # as a foreign one and preserve its stale copy in every dashboard
+        # instead of actually removing it.
+        managed_names = set(meta["managed_names"])
+        managed_names.add(name)
+        meta["managed_names"] = sorted(managed_names)
         await _async_save_meta(hass, meta)
 
     await async_sync_dashboards(hass)

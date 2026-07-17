@@ -129,6 +129,12 @@ A manual edit to the file won't update the panel's "last modified" column
 until the next panel save touches that key — sync it via **Sync now** if you
 want the dashboards updated immediately.
 
+Sync only ever touches templates this integration has actually managed
+(created, edited, or deleted through the panel). Any template a dashboard
+already had — from before you installed this integration, or one you've
+simply never opened in the panel — is left alone; it's merged in alongside
+the shared ones rather than being overwritten.
+
 ## Known limitations
 
 - **Sync race on concurrent edit**: if a dashboard is open in a browser's
