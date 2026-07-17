@@ -93,10 +93,10 @@ base:
 ```
 
 you don't need to manually split the name out or fix the indentation. Paste
-the whole block into the YAML editor as-is, then click **Extract name** in
-the dialog's footer (next to Cancel/Save, so it stays reachable no matter how
-long the pasted template is — a long editor can't scroll it out of view). If
-the editor's content is exactly one top-level key with a nested config under
+the whole block into the YAML editor as-is, then click **Fix pasted template**
+in the dialog's footer (next to Cancel/Save, so it stays reachable no matter
+how long the pasted template is — a long editor can't scroll it out of view).
+If the editor's content is exactly one top-level key with a nested config under
 it, that key moves into the Name field and the editor's content is replaced
 with just its value, re-indented to a clean 2-space style. If it isn't shaped
 that way (invalid YAML, or more/less than one top-level key), you'll get a

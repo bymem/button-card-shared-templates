@@ -146,7 +146,7 @@ function openTemplateFormDialog(hass, mountEl, { heading, name, originalName, is
     const unwrapBtn = document.createElement("ha-button");
     unwrapBtn.slot = "secondaryAction";
     unwrapBtn.setAttribute("appearance", "plain");
-    unwrapBtn.textContent = "Extract name";
+    unwrapBtn.textContent = "Fix pasted template";
 
     unwrapBtn.addEventListener("click", () => {
       if (currentYamlValid === false) {
