@@ -3661,6 +3661,35 @@ function openTemplateFormDialog(hass, mountEl, { heading, name, originalName, is
     yamlEditor.style.display = "flex";
     yamlEditor.style.flexDirection = "column";
     content.appendChild(yamlEditor);
+    const unwrapBtn = document.createElement("ha-button");
+    unwrapBtn.setAttribute("appearance", "plain");
+    unwrapBtn.hidden = true;
+    unwrapBtn.style.alignSelf = "flex-start";
+    content.appendChild(unwrapBtn);
+    const updateUnwrapButton = () => {
+      const keys = Object.keys(currentYamlObj || {});
+      const soleValue = keys.length === 1 ? currentYamlObj[keys[0]] : void 0;
+      if (keys.length === 1 && soleValue && typeof soleValue === "object") {
+        unwrapBtn.textContent = `Use "${keys[0]}" as name`;
+        unwrapBtn.hidden = false;
+      } else {
+        unwrapBtn.hidden = true;
+      }
+    };
+    updateUnwrapButton();
+    unwrapBtn.addEventListener("click", () => {
+      const [key] = Object.keys(currentYamlObj || {});
+      if (!key) {
+        return;
+      }
+      const value = currentYamlObj[key];
+      currentName = key;
+      nameField.value = key;
+      saveBtn.disabled = !currentName.trim();
+      currentYamlObj = value;
+      yamlEditor.setValue(value);
+      unwrapBtn.hidden = true;
+    });
     const errorEl = document.createElement("div");
     errorEl.style.color = "var(--error-color)";
     errorEl.hidden = true;
@@ -3687,6 +3716,7 @@ function openTemplateFormDialog(hass, mountEl, { heading, name, originalName, is
     yamlEditor.addEventListener("value-changed", (ev) => {
       currentYamlObj = ev.detail.value;
       currentYamlValid = ev.detail.isValid;
+      updateUnwrapButton();
     });
     saveBtn.addEventListener("click", async () => {
       const trimmedName = currentName.trim();

@@ -77,6 +77,27 @@ my_template_name:
 Renaming an existing template's **Name** and saving moves its config to the
 new key — the old key is removed, not duplicated.
 
+### Importing an old-style pasted template
+
+If you've got a template in the old per-dashboard copy/paste shape — a
+top-level name with the config nested (and possibly indented) under it, e.g.:
+
+```yaml
+base:
+    state:
+      - value: unavailable
+        icon: mdi:alert-circle-outline
+    styles:
+      card:
+        - padding: 12px
+```
+
+you don't need to manually split the name out or fix the indentation. Paste
+the whole block into the YAML editor as-is; a **Use "base" as name** button
+appears whenever the editor's content has exactly one top-level key. Clicking
+it moves that key into the Name field and replaces the editor's content with
+just its value, re-indented to a clean 2-space style.
+
 - Saving writes the template to `button_card_templates.yaml`, then pushes the
   full merged templates dict into every storage-mode dashboard's
   `button_card_templates` key.
